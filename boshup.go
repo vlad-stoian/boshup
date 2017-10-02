@@ -1,6 +1,8 @@
 package boshup
 
 import (
+	"strings"
+
 	"github.com/cloudfoundry/bosh-cli/director/template"
 	"github.com/cloudfoundry/bosh-utils/errors"
 	"github.com/cppforlife/go-patch/patch"
@@ -29,6 +31,49 @@ func getStaticVariablesFromMap(variables map[string]interface{}) (template.Varia
 	staticVariables := template.StaticVariables(variables)
 
 	return staticVariables, nil
+}
+
+func GetPath(manifestBytes []byte, path string) (string, error) {
+	tpl := template.NewTemplate(manifestBytes)
+
+	pathPointer, err := patch.NewPointerFromString(path)
+	if err != nil {
+		return "", errors.WrapError(err, "failed to create pointer from path")
+	}
+
+	evaluated, err := tpl.Evaluate(template.StaticVariables{}, patch.Ops{}, template.EvaluateOpts{
+		PostVarSubstitutionOp: patch.FindOp{Path: pathPointer},
+		UnescapedMultiline:    true,
+	})
+	if err != nil {
+		return "", errors.WrapError(err, "failed to evaluate get path")
+	}
+
+	trimmedEvaluated := strings.TrimSpace(string(evaluated))
+
+	return trimmedEvaluated, nil
+}
+
+func SetPath(manifestBytes []byte, path string, value interface{}) ([]byte, error) {
+	tpl := template.NewTemplate(manifestBytes)
+
+	pathPointer, err := patch.NewPointerFromString(path)
+	if err != nil {
+		return nil, errors.WrapError(err, "failed to create pointer from path")
+	}
+
+	evaluated, err := tpl.Evaluate(template.StaticVariables{}, patch.Ops{}, template.EvaluateOpts{
+		PostVarSubstitutionOp: patch.ReplaceOp{
+			Path:  pathPointer,
+			Value: value,
+		},
+		UnescapedMultiline: true,
+	})
+	if err != nil {
+		return nil, errors.WrapError(err, "failed to evaluate get path")
+	}
+
+	return evaluated, nil
 }
 
 func Interpolate(manifestBytes []byte, opsBytes []byte, variables map[string]interface{}) ([]byte, error) {

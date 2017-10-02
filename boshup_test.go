@@ -4,13 +4,15 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"strings"
+
 	"github.com/pivotal-cf/on-demand-services-sdk/bosh"
 	"github.com/pivotal-cf/on-demand-services-sdk/serviceadapter"
 	"github.com/vlad-stoian/boshup"
 	"gopkg.in/yaml.v2"
 )
 
-var _ = Describe("Boshup Interpolate", func() {
+var _ = Describe("BoshUp Interpolate", func() {
 
 	var manifest string
 	var ops string
@@ -114,7 +116,7 @@ key: ((variable))`
 	})
 })
 
-var _ = Describe("Boshup UpdateFromServiceDeployment", func() {
+var _ = Describe("BoshUp UpdateFromServiceDeployment", func() {
 	var boshManifest bosh.BoshManifest
 	var boshManifestBytes []byte
 
@@ -216,6 +218,113 @@ var _ = Describe("Boshup UpdateFromServiceDeployment", func() {
 
 			Expect(updatedBoshManifest.Releases[1].Name).To(Equal("service-deployment-release2-name"))
 			Expect(updatedBoshManifest.Releases[1].Version).To(Equal("service-deployment-release2-version"))
+		})
+	})
+})
+
+var _ = Describe("BoshUp GetPath", func() {
+
+	var manifest string
+	var path string
+
+	var getPathErr error
+	var result string
+
+	BeforeEach(func() {
+		manifest = `---
+key:
+  second_key:
+  - name: first_array_element
+    value: get-me-please
+  - this: is-multi-line
+    value: |
+        ok
+        this
+        is
+        weird`
+
+		path = "/key/second_key/name=first_array_element/value"
+	})
+
+	JustBeforeEach(func() {
+		manifestBytes := []byte(manifest)
+
+		result, getPathErr = boshup.GetPath(manifestBytes, path)
+	})
+
+	Context("when path is correct", func() {
+		It("returns the correct value", func() {
+			Expect(getPathErr).ToNot(HaveOccurred())
+			Expect(result).To(Equal("get-me-please"))
+		})
+	})
+
+	Context("when path is correct and value is multi line", func() {
+		BeforeEach(func() {
+			path = "/key/second_key/this=is-multi-line/value"
+		})
+		It("returns the correct value", func() {
+			Expect(getPathErr).ToNot(HaveOccurred())
+			Expect(result).To(Equal("ok\nthis\nis\nweird"))
+		})
+	})
+
+	Context("when path is not correct", func() {
+		BeforeEach(func() {
+			path = "/wrong/path"
+		})
+		It("returns an error", func() {
+			Expect(getPathErr).To(HaveOccurred())
+			Expect(getPathErr.Error()).To(ContainSubstring("failed to evaluate get path"))
+
+			Expect(result).To(BeEmpty())
+		})
+	})
+})
+
+var _ = Describe("BoshUp SetPath", func() {
+
+	var manifest string
+	var path string
+	var valueToBeSet interface{}
+
+	var updatedManifest string
+
+	BeforeEach(func() {
+		manifest = `---
+key:
+  second_key:
+  - name: first_array_element
+    value: get-me-please`
+
+		path = "/key/second_key/name=first_array_element/value"
+
+		valueToBeSet = map[interface{}]interface{}{
+			"some-random-key": map[interface{}]interface{}{
+				"level-2-random-key": "finally-value",
+			},
+		}
+	})
+
+	JustBeforeEach(func() {
+		manifestBytes := []byte(manifest)
+
+		updatedManifestBytes, setPathErr := boshup.SetPath(manifestBytes, path, valueToBeSet)
+		Expect(setPathErr).ToNot(HaveOccurred())
+
+		updatedManifest = string(updatedManifestBytes)
+
+	})
+
+	Context("when path is correct", func() {
+		It("sets the correct value", func() {
+			expectedManifestSnippet := strings.Join([]string{
+				"    value:",
+				"      some-random-key:",
+				"        level-2-random-key: finally-value",
+			}, "\n")
+
+			Expect(updatedManifest).To(ContainSubstring(expectedManifestSnippet))
 		})
 	})
 })
