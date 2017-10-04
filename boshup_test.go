@@ -207,7 +207,7 @@ var _ = Describe("BoshUp UpdateFromServiceDeployment", func() {
 				},
 			}
 		})
-		It("does update the stemcell", func() {
+		It("does update the releases", func() {
 			var updatedBoshManifest bosh.BoshManifest
 			yaml.Unmarshal(updatedManifestBytes, &updatedBoshManifest)
 
@@ -218,6 +218,20 @@ var _ = Describe("BoshUp UpdateFromServiceDeployment", func() {
 
 			Expect(updatedBoshManifest.Releases[1].Name).To(Equal("service-deployment-release2-name"))
 			Expect(updatedBoshManifest.Releases[1].Version).To(Equal("service-deployment-release2-version"))
+		})
+	})
+
+	Context("when the service deployment contains service deployment name", func() {
+		BeforeEach(func() {
+			serviceDeployment = serviceadapter.ServiceDeployment{
+				DeploymentName: "service-deployment-name",
+			}
+		})
+		It("does update the bosh manifest name", func() {
+			var updatedBoshManifest bosh.BoshManifest
+			yaml.Unmarshal(updatedManifestBytes, &updatedBoshManifest)
+
+			Expect(updatedBoshManifest.Name).To(Equal("service-deployment-name"))
 		})
 	})
 })

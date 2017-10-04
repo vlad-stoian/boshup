@@ -105,6 +105,8 @@ func UpdateFromServiceDeployment(manifestBytes []byte, serviceDeployment service
 		return nil, errors.WrapError(err, "failed to unmarshal boshManifest")
 	}
 
+	boshManifest.Name = serviceDeployment.DeploymentName
+
 	var stemcell bosh.Stemcell
 
 	if len(boshManifest.Stemcells) == 1 {
